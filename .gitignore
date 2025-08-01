@@ -1,6 +1,100 @@
-# Byte-compiled / optimized / DLL files
+import os
+import requests
+import json
+import time
+from github import Github  # PyGithub library
+from datetime import datetime
+
+def create_github_repository(token, repo_name, description="Advanced Keras Project"):
+    """Create a new GitHub repository"""
+    g = Github(token)
+    user = g.get_user()
+    
+    try:
+        repo = user.create_repo(
+            name=repo_name,
+            description=description,
+            private=False,
+            auto_init=False,
+            gitignore_template="Python",
+            license_template="mit"
+        )
+        print(f"Repository created: {repo.html_url}")
+        return repo
+    except Exception as e:
+        print(f"Error creating repository: {e}")
+        return None
+
+def setup_repository_contents(token, repo_name, project_name):
+    """Set up initial repository structure and files"""
+    g = Github(token)
+    repo = g.get_user().get_repo(repo_name)
+    
+    # Create directories and files
+    files_to_create = {
+        "README.md": f"# {repo_name}\n\nAdvanced Keras Project Template",
+        "requirements.txt": "tensorflow>=2.8.0\nnumpy\npandas\nmatplotlib\nscikit-learn\nyaml\nPyGithub\n",
+        "setup.py": "from setuptools import setup, find_packages\n\nsetup(\n    name='keras_project',\n    version='0.1',\n    packages=find_packages(),\n    install_requires=[\n        'tensorflow>=2.8.0',\n        'numpy',\n        'pandas'\n    ]\n)",
+        "src/__init__.py": "",
+        "src/data/__init__.py": "",
+        "src/models/__init__.py": "",
+        "src/utils/__init__.py": "",
+        "tests/__init__.py": "",
+        "notebooks/.gitkeep": "",
+        "data/.gitkeep": "",
+        "models/.gitkeep": "",
+        "reports/.gitkeep": "",
+        ".github/workflows/ci-cd.yml": """name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Run tests
+      run: |
+        python -m pytest tests/
+  
+  train:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Train model
+      run: |
+        python src/train.py
+    - name: Upload model artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: model
+        path: models/
+""",
+        ".gitignore": """# Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
 
 # C extensions
@@ -20,123 +114,26 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
 .tox/
 .nox/
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
 *.cover
-*.py.cover
+*.py,cover
 .hypothesis/
 .pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-#poetry.toml
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
-#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
-#pdm.lock
-#pdm.toml
-.pdm-python
-.pdm-build/
-
-# pixi
-#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
-#pixi.lock
-#   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
-#   in the .venv directory. It is recommended not to include this directory in version control.
-.pixi
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
 # Environments
 .env
-.envrc
 .venv
 env/
 venv/
@@ -144,64 +141,322 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Data files
+*.csv
+*.h5
+*.hdf5
+*.pkl
+*.pickle
 
-# Rope project settings
-.ropeproject
+# Logs
+logs/
+*.log
 
-# mkdocs documentation
-/site
+# IDE
+.vscode/
+.idea/
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+"""
+    }
+    
+    for file_path, content in files_to_create.items():
+        try:
+            # Check if directory needs to be created
+            dir_path = os.path.dirname(file_path)
+            if dir_path and dir_path not in repo.get_contents(""):
+                repo.create_file(
+                    path=f"{dir_path}/.gitkeep",
+                    message=f"Create {dir_path} directory",
+                    content="",
+                    branch="main"
+                )
+            
+            # Create file
+            repo.create_file(
+                path=file_path,
+                message=f"Add {file_path}",
+                content=content,
+                branch="main"
+            )
+            print(f"Created {file_path}")
+        except Exception as e:
+            print(f"Error creating {file_path}: {e}")
 
-# Pyre type checker
-.pyre/
+def add_keras_template_files(token, repo_name):
+    """Add advanced Keras template files to the repository"""
+    g = Github(token)
+    repo = g.get_user().get_repo(repo_name)
+    
+    # Main training script
+    train_script = """import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, models, callbacks, optimizers
+import yaml
+import os
+from datetime import datetime
+import numpy as np
 
-# pytype static type analyzer
-.pytype/
+def load_config():
+    \"\"\"Load configuration from YAML file\"\"\"
+    with open('config/config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    return config
 
-# Cython debug symbols
-cython_debug/
+def build_model(config):
+    \"\"\"Build Keras model based on configuration\"\"\"
+    input_shape = tuple(config['data']['input_shape'])
+    num_classes = config['data']['num_classes']
+    
+    inputs = keras.Input(shape=input_shape)
+    
+    # Data augmentation
+    if config['augmentation']['enabled']:
+        x = layers.RandomRotation(config['augmentation']['rotation_range'])(inputs)
+        x = layers.RandomZoom(config['augmentation']['zoom_range'])(x)
+        x = layers.RandomFlip(config['augmentation']['flip_mode'])(x)
+    else:
+        x = inputs
+    
+    # Model architecture
+    for i, filters in enumerate(config['model']['conv_filters']):
+        x = layers.Conv2D(filters, config['model']['kernel_size'], activation='relu', padding='same')(x)
+        x = layers.BatchNormalization()(x)
+        if i < len(config['model']['conv_filters']) - 1:  # No pooling after last conv layer
+            x = layers.MaxPooling2D(config['model']['pool_size'])(x)
+            x = layers.Dropout(config['model']['dropout_rate'])(x)
+    
+    x = layers.Flatten()(x)
+    for units in config['model']['dense_units']:
+        x = layers.Dense(units, activation='relu')(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.Dropout(config['model']['dense_dropout_rate'])(x)
+    
+    outputs = layers.Dense(num_classes, activation='softmax')(x)
+    
+    model = keras.Model(inputs=inputs, outputs=outputs)
+    
+    optimizer = optimizers.Adam(learning_rate=config['training']['initial_learning_rate'])
+    model.compile(
+        optimizer=optimizer,
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    
+    return model
 
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+def get_callbacks(config):
+    \"\"\"Create training callbacks\"\"\"
+    callbacks_list = []
+    
+    # Model checkpoint
+    os.makedirs('models', exist_ok=True)
+    checkpoint_path = os.path.join('models', 'best_model.h5')
+    model_checkpoint = callbacks.ModelCheckpoint(
+        filepath=checkpoint_path,
+        monitor=config['training']['monitor'],
+        save_best_only=True,
+        save_weights_only=False,
+        mode='auto'
+    )
+    callbacks_list.append(model_checkpoint)
+    
+    # Early stopping
+    early_stopping = callbacks.EarlyStopping(
+        monitor=config['training']['monitor'],
+        patience=config['training']['patience'],
+        min_delta=config['training']['min_delta'],
+        restore_best_weights=True
+    )
+    callbacks_list.append(early_stopping)
+    
+    # TensorBoard
+    log_dir = os.path.join('logs', datetime.now().strftime('%Y%m%d-%H%M%S'))
+    tensorboard = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    callbacks_list.append(tensorboard)
+    
+    return callbacks_list
 
-# Abstra
-# Abstra is an AI-powered process automation framework.
-# Ignore directories containing user credentials, local state, and settings.
-# Learn more at https://abstra.io/docs
-.abstra/
+def main():
+    \"\"\"Main training function\"\"\"
+    config = load_config()
+    
+    # Load data (placeholder - replace with your data loading)
+    (x_train, y_train), (x_val, y_val) = keras.datasets.cifar10.load_data()
+    x_train = x_train.astype('float32') / 255.0
+    x_val = x_val.astype('float32') / 255.0
+    
+    # Build and train model
+    model = build_model(config)
+    model.summary()
+    
+    callbacks_list = get_callbacks(config)
+    
+    history = model.fit(
+        x_train, y_train,
+        validation_data=(x_val, y_val),
+        epochs=config['training']['epochs'],
+        batch_size=config['data']['batch_size'],
+        callbacks=callbacks_list,
+        verbose=1
+    )
+    
+    # Save final model
+    model.save(os.path.join('models', 'final_model.h5'))
 
-# Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
-#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+if __name__ == '__main__':
+    main()
+"""
+    
+    # Configuration file
+    config_file = """data:
+  input_shape: [32, 32, 3]
+  num_classes: 10
+  batch_size: 32
 
-# Ruff stuff:
-.ruff_cache/
+model:
+  conv_filters: [32, 64, 128]
+  kernel_size: 3
+  pool_size: 2
+  dropout_rate: 0.3
+  dense_units: [128, 64]
+  dense_dropout_rate: 0.5
 
-# PyPI configuration file
-.pypirc
+training:
+  epochs: 50
+  initial_learning_rate: 0.001
+  monitor: val_loss
+  patience: 5
+  min_delta: 0.001
 
-# Cursor
-#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
-.cursorignore
-.cursorindexingignore
+augmentation:
+  enabled: true
+  rotation_range: 0.2
+  zoom_range: 0.2
+  flip_mode: horizontal
+"""
+    
+    # Test file
+    test_file = """import pytest
+import tensorflow as tf
+from src.models.train import build_model
+import yaml
 
-# Marimo
-marimo/_static/
-marimo/_lsp/
-__marimo__/
+@pytest.fixture
+def config():
+    \"\"\"Load test configuration\"\"\"
+    with open('config/test_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    return config
+
+def test_model_building(config):
+    \"\"\"Test that the model builds correctly\"\"\"
+    model = build_model(config)
+    assert model is not None
+    assert isinstance(model, tf.keras.Model)
+    
+    # Check input/output shapes
+    input_shape = tuple(config['data']['input_shape'])
+    num_classes = config['data']['num_classes']
+    assert model.input_shape[1:] == input_shape
+    assert model.output_shape[-1] == num_classes
+
+def test_model_training(config):
+    \"\"\"Test that the model can be trained on dummy data\"\"\"
+    model = build_model(config)
+    
+    # Create dummy data
+    input_shape = tuple(config['data']['input_shape'])
+    num_samples = 10
+    x_train = tf.random.normal((num_samples, *input_shape))
+    y_train = tf.random.uniform((num_samples, 1), maxval=config['data']['num_classes'], dtype=tf.int32)
+    
+    # Train for 1 epoch
+    history = model.fit(
+        x_train, y_train,
+        epochs=1,
+        batch_size=config['data']['batch_size'],
+        verbose=0
+    )
+    
+    assert 'loss' in history.history
+    assert 'accuracy' in history.history
+"""
+    
+    # Create config directory if it doesn't exist
+    try:
+        repo.create_file(
+            path="config/config.yaml",
+            message="Add base configuration",
+            content=config_file,
+            branch="main"
+        )
+        
+        repo.create_file(
+            path="config/test_config.yaml",
+            message="Add test configuration",
+            content=config_file,  # Same config for testing
+            branch="main"
+        )
+    except Exception as e:
+        print(f"Error creating config files: {e}")
+    
+    # Create main training script
+    try:
+        repo.create_file(
+            path="src/train.py",
+            message="Add main training script",
+            content=train_script,
+            branch="main"
+        )
+    except Exception as e:
+        print(f"Error creating training script: {e}")
+    
+    # Create test file
+    try:
+        repo.create_file(
+            path="tests/test_model.py",
+            message="Add model tests",
+            content=test_file,
+            branch="main"
+        )
+    except Exception as e:
+        print(f"Error creating test file: {e}")
+
+def automate_keras_project(token, repo_name):
+    """Full automation of Keras project creation on GitHub"""
+    print(f"Creating repository: {repo_name}")
+    repo = create_github_repository(token, repo_name)
+    
+    if repo:
+        print("Setting up repository structure...")
+        setup_repository_contents(token, repo_name, repo_name)
+        
+        print("Adding Keras template files...")
+        add_keras_template_files(token, repo_name)
+        
+        print(f"\nProject setup complete! Access your repository at: {repo.html_url}")
+        print("Next steps:")
+        print("1. Clone the repository locally")
+        print("2. Replace the placeholder data loading code with your actual data pipeline")
+        print("3. Adjust model architecture in src/train.py as needed")
+        print("4. Push changes to trigger CI/CD pipeline")
+    else:
+        print("Failed to create repository")
+
+if __name__ == "__main__":
+    # Get GitHub token from environment variable or user input
+    github_token = os.getenv("GITHUB_TOKEN")
+    if not github_token:
+        github_token = input("Enter your GitHub personal access token: ")
+    
+    repo_name = input("Enter repository name: ").strip()
+    
+    automate_keras_project(github_token, repo_name)
